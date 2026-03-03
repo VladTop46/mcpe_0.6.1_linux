@@ -1,0 +1,301 @@
+diff -ruN handheld2/src/client/gui/Screen.cpp handheld/src/client/gui/Screen.cpp
+--- handheld2/src/client/gui/Screen.cpp	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/client/gui/Screen.cpp	2026-03-03 11:57:52.872036862 +0900
+@@ -196,7 +196,7 @@
+ 		for (unsigned int i = 0; i < buttons.size(); ++i) {
+ 			Button* button = buttons[i];
+             //LOGI("Hit-testing button: %p\n", button);
+-			if (button->clicked(minecraft, x, y)) {
++			if (button->clicked(minecraft, x, y)) { LOGI("BUTTON HIT: %d\n", button->id);
+                 button->setPressed();
+ 
+                 //LOGI("Hit-test successful: %p\n", button);
+diff -ruN handheld2/src/client/gui/screens/SelectWorldScreen.cpp handheld/src/client/gui/screens/SelectWorldScreen.cpp
+--- handheld2/src/client/gui/screens/SelectWorldScreen.cpp	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/client/gui/screens/SelectWorldScreen.cpp	2026-03-03 12:00:57.991790995 +0900
+@@ -302,8 +302,8 @@
+ 			minecraft->hostMultiplayer();
+ 			minecraft->setScreen(new ProgressScreen());
+ 			_hasStartedLevel = true;
+-		#elif defined(WIN32)
+-			std::string name = getUniqueLevelName("perf");
++		#elif defined(WIN32) || defined(LINUX)
++			std::string name = getUniqueLevelName("World");
+ 			minecraft->setScreen(new SimpleChooseLevelScreen(name));
+ 		#else
+ 			int status = minecraft->platform()->getUserInputStatus();
+diff -ruN handheld2/src/client/gui/screens/SimpleChooseLevelScreen.cpp handheld/src/client/gui/screens/SimpleChooseLevelScreen.cpp
+--- handheld2/src/client/gui/screens/SimpleChooseLevelScreen.cpp	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/client/gui/screens/SimpleChooseLevelScreen.cpp	2026-03-03 11:54:17.196323582 +0900
+@@ -24,7 +24,7 @@
+ 
+ void SimpleChooseLevelScreen::init()
+ {
+-	if (minecraft->useTouchscreen()) {
++	if (false) {
+ 		bCreative = new Touch::TButton(1, "Creative mode");
+ 		bSurvival = new Touch::TButton(2, "Survival mode");
+ 		bBack	  = new Touch::TButton(3, "Back");
+@@ -71,7 +71,7 @@
+ 		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+ 		return;
+ 	}
+-	if (hasChosen)
++	LOGI("BUTTON CLICKED: %d\n", button->id); if (hasChosen)
+ 		return;
+ 
+ 	int gameType;
+diff -ruN handheld2/src/client/Minecraft.cpp handheld/src/client/Minecraft.cpp
+--- handheld2/src/client/Minecraft.cpp	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/client/Minecraft.cpp	2026-03-03 12:05:47.442406562 +0900
+@@ -174,7 +174,7 @@
+ 	isLookingForMultiplayer(false),
+ 	_licenseId(LicenseCodes::WAIT_PLATFORM_NOT_READY),
+ 	inputHolder(0),
+-	_supportsNonTouchscreen(false),
++	_supportsNonTouchscreen(true),
+ #ifndef STANDALONE_SERVER
+ 	screenChooser(this),
+ #endif
+@@ -1124,7 +1124,7 @@
+ 
+ bool Minecraft::useTouchscreen() {
+ #ifdef RPI
+-	return false;
++	return options.useTouchScreen || !_supportsNonTouchscreen;
+ #endif
+ 	return options.useTouchScreen || !_supportsNonTouchscreen;
+ }
+@@ -1138,7 +1138,7 @@
+ #ifndef STANDALONE_SERVER
+ 	checkGlError("Init enter");
+ 
+-	_supportsNonTouchscreen = !platform()->supportsTouchscreen();
++	_supportsNonTouchscreen = true;
+ 
+ 	LOGI("IS TOUCHSCREEN? %d\n", options.useTouchScreen);
+ 
+@@ -1291,7 +1291,7 @@
+ 		isLookingForMultiplayer = false;
+ 		return raknetInstance->connect(server.address.ToString(false), server.address.GetPort());
+ 	}
+-	return false;
++	return options.useTouchScreen || !_supportsNonTouchscreen;
+ }
+ 
+ void Minecraft::hostMultiplayer(int port) {
+@@ -1503,7 +1503,7 @@
+ 
+ bool Minecraft::isKindleFire(int kindleVersion) {
+ 	if (kindleVersion != 1)
+-		return false;
++		return options.useTouchScreen || !_supportsNonTouchscreen;
+ 
+ 	std::string model = platform()->getPlatformStringVar(PlatformStringVars::DEVICE_BUILD_MODEL);
+ 	std::string modelLower(model);
+diff -ruN handheld2/src/client/renderer/Textures.cpp handheld/src/client/renderer/Textures.cpp
+--- handheld2/src/client/renderer/Textures.cpp	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/client/renderer/Textures.cpp	2026-03-03 10:46:31.206393121 +0900
+@@ -80,7 +80,7 @@
+ TextureId Textures::assignTexture( const std::string& resourceName, const TextureData& img )
+ {
+ 	TextureId id;
+-	glGenTextures(1, &id);
++	glGenTextures(1, &id); fprintf(stderr, "TEXTURE LOADED: id=%d\n", id);
+ 
+ 	bind(id);
+ 
+@@ -354,5 +354,4 @@
+ //  void releaseTexture(int id) {
+ //      loadedImages.erase(id);
+ //      glDeleteTextures(1, (const GLuint*)&id);
+-//  }
+-
++//  }
+\ В конце файла нет новой строки
+diff -ruN handheld2/src/client/renderer/Textures.h handheld/src/client/renderer/Textures.h
+--- handheld2/src/client/renderer/Textures.h	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/client/renderer/Textures.h	2026-03-03 10:44:59.548323690 +0900
+@@ -58,7 +58,7 @@
+ public:
+ 	static bool MIPMAP;
+ 	static int textureChanges;
+-	static const TextureId InvalidId = -1;
++	static constexpr TextureId InvalidId = (TextureId)-1;
+ 
+ private:
+ 	TextureMap idMap;
+diff -ruN handheld2/src/main.cpp handheld/src/main.cpp
+--- handheld2/src/main.cpp	2013-02-08 05:40:54.000000000 +1000
++++ handheld/src/main.cpp	2026-03-03 09:50:50.324082242 +0900
+@@ -37,4 +37,8 @@
+     #include "main_rpi.h"
+ #endif
+ 
++#ifdef LINUX
++    #include "main_linux.h"
++#endif
++
+ 
+diff -ruN handheld2/src/main_linux.h handheld/src/main_linux.h
+--- handheld2/src/main_linux.h	1970-01-01 09:00:00.000000000 +0900
++++ handheld/src/main_linux.h	2026-03-03 12:07:43.910251875 +0900
+@@ -0,0 +1,157 @@
++#ifndef MAIN_LINUX_H__
++#define MAIN_LINUX_H__
++
++#include <cassert>
++#include <fstream>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <unistd.h>
++#include <png.h>
++
++#include <SDL/SDL.h>
++
++#include "App.h"
++#include "AppConstants.h"
++#include "AppPlatform.h"
++#include "platform/input/Mouse.h"
++#include "platform/input/Multitouch.h"
++#include "platform/input/Keyboard.h"
++
++static void png_readCallback(png_structp pngPtr, png_bytep data, png_size_t length) {
++    ((std::istream*)png_get_io_ptr(pngPtr))->read((char*)data, length);
++}
++
++class AppPlatform_linux : public AppPlatform {
++public:
++
++    TextureData loadTexture(const std::string& filename_, bool textureFolder) {
++        TextureData out;
++        std::string filename = textureFolder ? "data/images/" + filename_ : filename_;
++        std::ifstream source(filename.c_str(), std::ios::binary);
++        fprintf(stderr, "LOADING: %s (exists=%d)\n", filename.c_str(), (bool)source);
++        if (!source) { fprintf(stderr, "FILE NOT FOUND: %s\n", filename.c_str()); return out; } fprintf(stderr, "FILE FOUND: %s\n", filename.c_str());
++        png_structp pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
++        if (!pngPtr) return out;
++        png_infop infoPtr = png_create_info_struct(pngPtr);
++        if (!infoPtr) { png_destroy_read_struct(&pngPtr, NULL, NULL); return out; }
++        png_set_read_fn(pngPtr, (void*)&source, png_readCallback);
++        png_read_info(pngPtr, infoPtr);
++        out.w = png_get_image_width(pngPtr, infoPtr);
++        out.h = png_get_image_height(pngPtr, infoPtr);
++        png_bytep* rowPtrs = new png_bytep[out.h];
++        out.data = new unsigned char[4 * out.w * out.h];
++        out.memoryHandledExternally = false;
++        for (int i = 0; i < out.h; i++)
++            rowPtrs[i] = (png_bytep)&out.data[i * 4 * out.w];
++        png_read_image(pngPtr, rowPtrs); fprintf(stderr, "PNG READ: %s %dx%d\n", filename.c_str(), out.w, out.h);
++        png_destroy_read_struct(&pngPtr, &infoPtr, NULL);
++        delete[] rowPtrs;
++        return out;
++    }
++};
++
++static int g_width  = 854;
++static int g_height = 480;
++
++static unsigned char transformKey(int key) {
++    if (key == SDLK_LSHIFT)  return Keyboard::KEY_LSHIFT;
++    if (key == SDLK_DOWN)    return 40;
++    if (key == SDLK_UP)      return 38;
++    if (key == SDLK_SPACE)   return Keyboard::KEY_SPACE;
++    if (key == SDLK_RETURN)  return 13;
++    if (key == SDLK_ESCAPE)  return Keyboard::KEY_ESCAPE;
++    if (key == SDLK_TAB)     return 250;
++    if (key >= 'a' && key <= 'z') return key - 32;
++    if (key >= SDLK_0 && key <= SDLK_9) return '0' + (key - SDLK_0);
++    return 0;
++}
++
++static int handleEvents() {
++    SDL_Event event;
++    while (SDL_PollEvent(&event)) {
++        switch (event.type) {
++        case SDL_QUIT: return -1;
++        case SDL_KEYDOWN: { unsigned char k = transformKey(event.key.keysym.sym); if (k) Keyboard::feed(k, 1); break; }
++        case SDL_KEYUP:   { unsigned char k = transformKey(event.key.keysym.sym); if (k) Keyboard::feed(k, 0); break; }
++        case SDL_MOUSEBUTTONDOWN:
++            if (event.button.button == SDL_BUTTON_WHEELUP)
++                Mouse::feed(3, 0, event.button.x, event.button.y, 0, 1);
++            else if (event.button.button == SDL_BUTTON_WHEELDOWN)
++                Mouse::feed(3, 0, event.button.x, event.button.y, 0, -1);
++            else {
++                char btn = (event.button.button == SDL_BUTTON_LEFT) ? 1 : 2;
++                Mouse::feed(btn, 1, event.button.x, event.button.y);
++                Multitouch::feed(btn, 1, event.button.x, event.button.y, 0);
++            }
++            break;
++        case SDL_MOUSEBUTTONUP: {
++            char btn = (event.button.button == SDL_BUTTON_LEFT) ? 1 : 2;
++            Mouse::feed(btn, 0, event.button.x, event.button.y);
++            Multitouch::feed(btn, 0, event.button.x, event.button.y, 0);
++            break;
++        }
++        case SDL_MOUSEMOTION:
++            Mouse::feed(0, 0, event.motion.x, event.motion.y, event.motion.xrel, event.motion.yrel);
++            Multitouch::feed(0, 0, event.motion.x, event.motion.y, 0);
++            break;
++        default: break;
++        }
++    }
++    return 0;
++}
++
++int main(int argc, char** argv) {
++    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
++        fprintf(stderr, "Couldn't initialize SDL: %s\n", SDL_GetError());
++        return -1;
++    }
++
++    // Просим SDL создать OpenGL контекстvirtual bool supportsTouchscreen() { return true; } — gl4es его перехватит
++    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,   8);
++    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
++    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,  8);
++    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
++    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
++
++    SDL_Surface* screen = SDL_SetVideoMode(g_width, g_height, 32, SDL_OPENGL | SDL_RESIZABLE);
++    if (!screen) {
++        fprintf(stderr, "Couldn't create SDL window: %s\n", SDL_GetError());
++        return -2;
++    }
++    SDL_WM_SetCaption(APP_NAME, NULL);
++
++    if (argc > 0) {
++        std::string path = argv[0];
++        size_t e = path.rfind('/');
++        if (e != std::string::npos) { path = path.substr(0, e); chdir(path.c_str()); }
++    }
++
++    // AppContext без EGL — используем NO_EGL стиль, просто передаём платформу
++    AppContext context;
++    AppPlatform_linux platform;
++    context.platform = &platform;
++    context.doRender = true;
++    // display/context/surface не используются — swapBuffers делает SDL
++
++    MAIN_CLASS* app = new MAIN_CLASS();
++    std::string home = getenv("HOME") ? getenv("HOME") : ".";
++    app->externalStoragePath      = home + "/.minecraft/";
++    app->externalCacheStoragePath = home + "/.minecraft/";
++    if (argc > 1) { int port = atoi(argv[1]); if (port) app->commandPort = port; }
++
++    app->App::init(context);
++    app->setSize(g_width, g_height);
++
++    while (!app->wantToQuit()) {
++        if (handleEvents() != 0) break;
++        app->update();
++        SDL_GL_SwapBuffers();  // вместо eglSwapBuffers
++    }
++
++    SDL_Quit();
++    delete app;
++    return 0;
++}
++
++#endif /* MAIN_LINUX_H__ */
+\ В конце файла нет новой строки
