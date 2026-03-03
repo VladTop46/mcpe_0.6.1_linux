@@ -31,6 +31,13 @@ workdir/
 └── README.md
 ```
 
+### 1.1 Convert CRLF source files to LF
+```
+find . -type f -name "*.cpp" -o -name "*.h" | xargs dos2unix
+```
+
+You need to install dos2unix package for your distro
+
 ### 2. Apply the Linux port patch
 
 ```bash
