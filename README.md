@@ -22,9 +22,9 @@ git clone https://github.com/VladTop46/mcpe_0.6.1_linux
 
 ### 1. Prepare the source tree
 
-Place the original `handheld` and `data` source directory inside this repository directory, so that the structure looks like this:
+Place the original `handheld` source directory inside this repository directory, so that the structure looks like this:
 ```
-workdir/
+mcpe_0.6.1_linux/
 ├── build_container
 ├── handheld
 ├── mcpe_linux_port.patch
